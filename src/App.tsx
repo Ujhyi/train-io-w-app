@@ -1,16 +1,15 @@
 import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
 
-import Navbar from "./components/Navbar.tsx";
-import HomePage from "./pages/main/HomePage.tsx";
-import TeamPage from "./pages/main/TeamPage.tsx";
-import JoinPage from "./pages/main/JoinPage.tsx";
-import MatchPage from "./pages/main/MatchPage.tsx";
-import TrainingPage from "./pages/main/TrainingPage.tsx";
-import Login from "./pages/auth/Login.tsx";
-import Footer from "./components/Footer.tsx";
-
+import HomePage from "./pages/main/HomePage";
+import TeamPage from "./pages/main/TeamPage";
+import JoinPage from "./pages/main/JoinPage";
+import MatchPage from "./pages/main/MatchPage";
+import TrainingPage from "./pages/main/TrainingPage";
+import Login from "./pages/auth/Login";
 
 const App: React.FC = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(
@@ -19,21 +18,38 @@ const App: React.FC = () => {
 
     return (
         <Router>
-            {isAuthenticated && <Navbar />}
-            <Routes>
-                <Route path="/" element={isAuthenticated ? <HomePage /> : <Navigate to="/login" />}/>
-                <Route path="*" element={<Navigate to="/login" replace />} />
-                <Route path="/login" element={isAuthenticated ? (<Navigate to="/" />) : (<Login onLogin={() => setIsAuthenticated(true)} />)}/>b
+            <div className="min-h-screen flex flex-col bg-gray-100">
+                {isAuthenticated && <Navbar />}
 
-                <Route path="/home" element={isAuthenticated ? <HomePage /> : <Navigate to="/login" />}/>
-                <Route path="/team" element={isAuthenticated ? <TeamPage /> : <Navigate to="/login" />}/>
-                <Route path="/join" element={isAuthenticated ? <JoinPage /> : <Navigate to="/login" />}/>
-                <Route path="/training" element={isAuthenticated ? <TrainingPage /> : <Navigate to="/login" />}/>
-                <Route path="/match" element={isAuthenticated ? <MatchPage /> : <Navigate to="/login" />}/>
+                {/* toto spraví, že obsah zaberie voľné miesto a footer ide dole */}
+                <main className="flex-1">
+                    <Routes>
+                        <Route path="/" element={isAuthenticated ? <HomePage /> : <Navigate to="/login" />} />
+                        <Route path="/home" element={isAuthenticated ? <HomePage /> : <Navigate to="/login" />} />
+                        <Route path="/team" element={isAuthenticated ? <TeamPage /> : <Navigate to="/login" />} />
+                        <Route path="/join" element={isAuthenticated ? <JoinPage /> : <Navigate to="/login" />} />
+                        <Route path="/training" element={isAuthenticated ? <TrainingPage /> : <Navigate to="/login" />} />
+                        <Route path="/match" element={isAuthenticated ? <MatchPage /> : <Navigate to="/login" />} />
 
-            </Routes>
-            {isAuthenticated && <Footer />}
+                        <Route
+                            path="/login"
+                            element={
+                                isAuthenticated ? (
+                                    <Navigate to="/" />
+                                ) : (
+                                    <Login onLogin={() => setIsAuthenticated(true)} />
+                                )
+                            }
+                        />
+
+                        <Route path="*" element={<Navigate to="/login" replace />} />
+                    </Routes>
+                </main>
+
+                {isAuthenticated && <Footer />}
+            </div>
         </Router>
     );
 };
+
 export default App;
