@@ -536,7 +536,7 @@ const MatchPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen p-4 md:p-8 bg-gradient-to-b from-blue-50 to-white">
+        <div className="bg-gray-100 p-6 w-full">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center gap-2 mb-6 md:mb-8">
