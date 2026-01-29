@@ -1,5 +1,10 @@
 import React, { useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+    HashRouter as Router,
+    Routes,
+    Route,
+    Navigate,
+} from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -20,29 +25,39 @@ const App: React.FC = () => {
         <Router>
             <div className="min-h-screen flex flex-col bg-gray-100">
                 {isAuthenticated && <Navbar />}
-
-                {/* toto spraví, že obsah zaberie voľné miesto a footer ide dole */}
                 <main className="flex-1">
                     <Routes>
-                        <Route path="/" element={isAuthenticated ? <HomePage /> : <Navigate to="/login" />} />
-                        <Route path="/home" element={isAuthenticated ? <HomePage /> : <Navigate to="/login" />} />
-                        <Route path="/team" element={isAuthenticated ? <TeamPage /> : <Navigate to="/login" />} />
-                        <Route path="/join" element={isAuthenticated ? <JoinPage /> : <Navigate to="/login" />} />
-                        <Route path="/training" element={isAuthenticated ? <TrainingPage /> : <Navigate to="/login" />} />
-                        <Route path="/match" element={isAuthenticated ? <MatchPage /> : <Navigate to="/login" />} />
 
+                        {/* Root */}
+                        <Route
+                            path="/"
+                            element={
+                                isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
+                            }
+                        />
+
+                        {/* Pages */}
+                        <Route path="/home" element={isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />} />
+                        <Route path="/team" element={isAuthenticated ? <TeamPage /> : <Navigate to="/login" replace />} />
+                        <Route path="/join" element={isAuthenticated ? <JoinPage /> : <Navigate to="/login" replace />} />
+                        <Route path="/training" element={isAuthenticated ? <TrainingPage /> : <Navigate to="/login" replace />} />
+                        <Route path="/match" element={isAuthenticated ? <MatchPage /> : <Navigate to="/login" replace />} />
+
+                        {/* Login */}
                         <Route
                             path="/login"
                             element={
                                 isAuthenticated ? (
-                                    <Navigate to="/" />
+                                    <Navigate to="/" replace />
                                 ) : (
                                     <Login onLogin={() => setIsAuthenticated(true)} />
                                 )
                             }
                         />
 
+                        {/* Fallback */}
                         <Route path="*" element={<Navigate to="/login" replace />} />
+
                     </Routes>
                 </main>
 
