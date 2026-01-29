@@ -5,7 +5,7 @@ import pkg from "./package.json";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: "/train-io-app",
+  base: "/train-io-w-app/",
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
