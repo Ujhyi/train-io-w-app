@@ -7,17 +7,15 @@ export type NavbarProps = {
 };
 
 const Navbar: React.FC<NavbarProps> = ({ onLoggedOut }) => {
-    // UI state
+
     const [isOpen, setIsOpen] = React.useState(false); // mobile menu
     const [isSettingsOpen, setIsSettingsOpen] = React.useState(false); // desktop dropdown
     const [isSettingsOpenMobile, setIsSettingsOpenMobile] = React.useState(false);
     const [isAccountOpenMobile, setisAccountOpenMobile] = React.useState(false);
     const [isAccountOpen, setIsAccountOpen] = React.useState(false); // desktop account dropdown
 
-    // Refs for click-outside detection
     const dropdownRef = React.useRef<HTMLLIElement | null>(null);
     const accountRef = React.useRef<HTMLLIElement | null>(null);
-
     const navigate = useNavigate();
 
     const handleLinkClick = () => {
@@ -28,7 +26,6 @@ const Navbar: React.FC<NavbarProps> = ({ onLoggedOut }) => {
         setisAccountOpenMobile(false);
     };
 
-    // Close dropdowns on click outside
     React.useEffect(() => {
         const onClickOutside = (e: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -73,14 +70,8 @@ const Navbar: React.FC<NavbarProps> = ({ onLoggedOut }) => {
             // Always clear tokens
             localStorage.removeItem("accessToken");
             localStorage.removeItem("refreshToken");
-
-            // Optional callback for parent
             onLoggedOut?.();
-
-            // 1) Try SPA navigation
             navigate("/login", { replace: true });
-
-            // 2) Ensure full reload if needed
             setTimeout(() => {
                 window.location.assign("/login");
             }, 0);
@@ -139,9 +130,9 @@ const Navbar: React.FC<NavbarProps> = ({ onLoggedOut }) => {
                         </button>
                         {isAccountOpen && (
                             <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
-                                <Link to="/TEST" onClick={handleLinkClick} className="block px-3 py-2 hover:bg-gray-50">TEST</Link>
+                                {/* <Link to="/TEST" onClick={handleLinkClick} className="block px-3 py-2 hover:bg-gray-50">TEST</Link>
                                 <Link to="/TEST1" onClick={handleLinkClick} className="block px-3 py-2 hover:bg-gray-50">TEST1</Link>
-                                <Link to="/TEST2" onClick={handleLinkClick} className="block px-3 py-2 hover:bg-gray-50">TEST2</Link>
+                                <Link to="/TEST2" onClick={handleLinkClick} className="block px-3 py-2 hover:bg-gray-50">TEST2</Link> */}
                                 <Link to="/login" onClick={logout} className="block px-3 py-2 hover:bg-gray-50">Logout</Link>
                             </div>
                         )}

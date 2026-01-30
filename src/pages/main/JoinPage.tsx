@@ -15,7 +15,6 @@ type TeamAction = "LEAVE" | "DELETE";
 type JoinBody = {
     position: string;
     number: number;
-    stick: "LEFT" | "RIGHT";
 };
 
 const CORE_API = import.meta.env.VITE_CORE_API;
@@ -39,11 +38,9 @@ function getErrorMessage(err: unknown) {
 const EMPTY_JOIN_FORM: JoinBody = {
     position: "C",
     number: 19,
-    stick: "LEFT",
 };
 
 const JoinPage: React.FC = () => {
-    // token iba z formularu
     const [joinToken, setJoinToken] = useState("");
 
     const [form, setForm] = useState<JoinBody>(EMPTY_JOIN_FORM);
@@ -68,8 +65,7 @@ const JoinPage: React.FC = () => {
             joinToken.trim().length > 0 &&
             form.position.trim().length > 0 &&
             Number.isFinite(form.number) &&
-            form.number > 0 &&
-            !!form.stick
+            form.number > 0
         );
     }, [joinToken, form]);
 
@@ -256,19 +252,6 @@ const JoinPage: React.FC = () => {
                                 className="w-full h-9 px-3 rounded-lg border border-gray-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
                                 required
                             />
-                        </div>
-
-                        <div className="md:col-span-2">
-                            <label className="block text-sm text-gray-600 mb-1">Stick</label>
-                            <select
-                                value={form.stick}
-                                onChange={(e) => setForm((p) => ({ ...p, stick: e.target.value as JoinBody["stick"] }))}
-                                className="w-full h-9 px-3 rounded-lg border border-gray-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
-                                required
-                            >
-                                <option value="LEFT">LEFT</option>
-                                <option value="RIGHT">RIGHT</option>
-                            </select>
                         </div>
 
                         <button
