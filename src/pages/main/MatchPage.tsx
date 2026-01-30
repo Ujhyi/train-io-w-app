@@ -34,6 +34,9 @@ type CreateMatchBody = {
     type: string;
 };
 
+type Vote = "GOING" | "DECLINED" | "TBD" | null;
+type AttendanceStatus = "YES" | "NO" | "TBD";
+
 type AttendanceApiItem = {
     itemId: string;
     clientId: string;
@@ -41,9 +44,6 @@ type AttendanceApiItem = {
     status: AttendanceStatus;
     updatedAt: string;
 };
-
-type Vote = "GOING" | "DECLINED" | "TBD" | null;
-type AttendanceStatus = "YES" | "NO" | "TBD";
 
 const CORE_API = import.meta.env.VITE_CORE_API;
 const INTEGRATION_API = import.meta.env.VITE_INTEGRATION_API;
@@ -154,7 +154,7 @@ const MatchPage: React.FC = () => {
     const [voteMap, setVoteMap] = useState<Record<string, Vote>>({});
 
     const [panelOpen, setPanelOpen] = useState(false);
-    const [panelMatchName,] = useState<string | null>(null);
+    const [panelMatchName] = useState<string | null>(null);
     const [panelTeamId, setPanelTeamId] = useState<string | null>(null);
     const [panelMatchId, setPanelMatchId] = useState<string | null>(null);
 
@@ -188,7 +188,6 @@ const MatchPage: React.FC = () => {
         meetTime: "00:00:00",
         type: "HOME",
     };
-
 
     const [creating, setCreating] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
@@ -309,7 +308,6 @@ const MatchPage: React.FC = () => {
             await loadMatchesOnly(selectedTeamId);
             await fetchMyAttendanceAndApply(selectedTeamId);
         })();
-
     }, [selectedTeamId]);
 
     const fetchAttendance = async (teamId: string, matchId: string, force?: boolean) => {
@@ -353,13 +351,10 @@ const MatchPage: React.FC = () => {
             const teamId = matchToDelete.teamId;
             const matchId = matchToDelete.matchId;
 
-            const res = await fetch(
-                `${INTEGRATION_API}/teams/${teamId}/matches/${matchId}/delete`,
-                {
-                    method: "DELETE",
-                    headers: authHeaders(),
-                }
-            );
+            const res = await fetch(`${INTEGRATION_API}/teams/${teamId}/matches/${matchId}/delete`, {
+                method: "DELETE",
+                headers: authHeaders(),
+            });
 
             if (res.status === 401) throw new Error("401 Unauthorized – delete match (token).");
 
@@ -482,6 +477,7 @@ const MatchPage: React.FC = () => {
     const canCreate = useMemo(() => {
         if (!selectedTeamId || selectedTeamId === "ALL") return false;
         return (
+            createBody.opponent.trim().length > 0 &&
             createBody.place.trim().length > 0 &&
             createBody.date.trim().length > 0 &&
             createBody.startTime.trim().length > 0 &&
@@ -516,14 +512,10 @@ const MatchPage: React.FC = () => {
 
             setCreateSuccess("Match has been created.");
             setShowCreate(false);
-            setCreateBody(EMPTY_FORM);
-            loadMatchesOnly(selectedTeamId)
+            setCreateBody({ ...EMPTY_FORM });
 
-            setTimeout(() => {
-                setCreateSuccess(null);
-            }, 2000);
+            setTimeout(() => setCreateSuccess(null), 2000);
 
-            setCreateBody((prev) => ({ ...prev, place: "", date: "" }));
             attendanceCacheRef.current = {};
             setVoteMap({});
             await loadMatchesOnly(selectedTeamId);
@@ -541,7 +533,12 @@ const MatchPage: React.FC = () => {
                 {/* Header */}
                 <div className="flex items-center gap-2 mb-6 md:mb-8">
                     <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-800">Matches</h1>
-                    <button onClick={() => selectedTeamId !== "ALL" && loadMatchesOnly(selectedTeamId)} className="ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm shadow-sm"  title="Refresh Matches"  type="button">
+                    <button
+                        onClick={() => selectedTeamId !== "ALL" && loadMatchesOnly(selectedTeamId)}
+                        className="ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm shadow-sm"
+                        title="Refresh Matches"
+                        type="button"
+                    >
                         <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
                         <span className="hidden xs:inline">Refresh</span>
                     </button>
@@ -551,7 +548,13 @@ const MatchPage: React.FC = () => {
                 <section className="bg-white shadow-xl rounded-2xl p-4 md:p-10 mb-8 md:mb-12 border border-gray-200">
                     <div className="flex items-center gap-2 mb-4 md:mb-6">
                         <h2 className="text-xl md:text-2xl font-bold text-gray-700">Create Match</h2>
-                        <button type="button" aria-expanded={showCreate} onClick={() => setShowCreate((v) => !v)} className="ml-auto inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50 text-sm shadow-sm" title={showCreate ? "Hide" : "Show"}>
+                        <button
+                            type="button"
+                            aria-expanded={showCreate}
+                            onClick={() => setShowCreate((v) => !v)}
+                            className="ml-auto inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50 text-sm shadow-sm"
+                            title={showCreate ? "Hide" : "Show"}
+                        >
                             <span className={`inline-block h-1.5 w-1.5 rounded-full ${showCreate ? "bg-indigo-500" : "bg-gray-400"}`} />
                             {showCreate ? "Hide" : "Show"}
                         </button>
@@ -626,8 +629,6 @@ const MatchPage: React.FC = () => {
                                         <option value="AWAY">AWAY</option>
                                     </select>
                                 </div>
-
-
 
                                 <div>
                                     <label className="block text-sm text-gray-600 mb-1">Match Meet Time</label>
@@ -719,8 +720,8 @@ const MatchPage: React.FC = () => {
                                         <div className="flex items-center gap-2 mb-1">
                                             <h4 className="text-lg md:text-xl font-bold text-blue-700">{t.opponent}</h4>
                                             <span className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-              {t.type}
-            </span>
+                                                {t.type}
+                                            </span>
                                         </div>
 
                                         <p className="text-gray-500 text-xs md:text-sm mb-1">• {formatDate(toDate(t.date, "00:00:00"))}</p>
@@ -742,14 +743,14 @@ const MatchPage: React.FC = () => {
                                                     ].join(" ")}
                                                     title="I'm going"
                                                 >
-                <span
-                    className={[
-                        "inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full",
-                        goingActive ? "bg-white/20" : "bg-green-600/10 group-hover:bg-green-600/20",
-                    ].join(" ")}
-                >
-                  <ThumbUpIcon className={goingActive ? "h-5 w-5 text-white" : "h-5 w-5 text-green-600"} />
-                </span>
+                                                    <span
+                                                        className={[
+                                                            "inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full",
+                                                            goingActive ? "bg-white/20" : "bg-green-600/10 group-hover:bg-green-600/20",
+                                                        ].join(" ")}
+                                                    >
+                                                        <ThumbUpIcon className={goingActive ? "h-5 w-5 text-white" : "h-5 w-5 text-green-600"} />
+                                                    </span>
                                                 </button>
 
                                                 <button
@@ -764,14 +765,14 @@ const MatchPage: React.FC = () => {
                                                     ].join(" ")}
                                                     title="Decline"
                                                 >
-                <span
-                    className={[
-                        "inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full",
-                        declinedActive ? "bg-white/20" : "bg-red-600/10 group-hover:bg-red-600/20",
-                    ].join(" ")}
-                >
-                  <ThumbDownIcon className={declinedActive ? "h-5 w-5 text-white" : "h-5 w-5 text-red-600"} />
-                </span>
+                                                    <span
+                                                        className={[
+                                                            "inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full",
+                                                            declinedActive ? "bg-white/20" : "bg-red-600/10 group-hover:bg-red-600/20",
+                                                        ].join(" ")}
+                                                    >
+                                                        <ThumbDownIcon className={declinedActive ? "h-5 w-5 text-white" : "h-5 w-5 text-red-600"} />
+                                                    </span>
                                                 </button>
 
                                                 <button
@@ -786,14 +787,14 @@ const MatchPage: React.FC = () => {
                                                     ].join(" ")}
                                                     title="TBD"
                                                 >
-                <span
-                    className={[
-                        "inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full font-bold text-[10px]",
-                        tbdActive ? "bg-black/10" : "bg-yellow-400/20 group-hover:bg-yellow-400/30",
-                    ].join(" ")}
-                >
-                  TBD
-                </span>
+                                                    <span
+                                                        className={[
+                                                            "inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full font-bold text-[10px]",
+                                                            tbdActive ? "bg-black/10" : "bg-yellow-400/20 group-hover:bg-yellow-400/30",
+                                                        ].join(" ")}
+                                                    >
+                                                        TBD
+                                                    </span>
                                                 </button>
                                             </div>
 
@@ -815,21 +816,18 @@ const MatchPage: React.FC = () => {
                                             <p className="text-gray-400 text-[11px]">Match ID: {t.matchId}</p>
                                         </div>
 
+                                        {/* ✅ CHANGED DELETE BUTTON (pill style like Trainings) */}
                                         <button
                                             type="button"
-                                            className="absolute bottom-5 right-5 text-red-600 hover:text-red-700 transition"
                                             onClick={() => {
                                                 setDeleteError(null);
                                                 setMatchToDelete(t);
                                                 setDeleteOpen(true);
                                             }}
+                                            className="absolute bottom-5 right-5 rounded-xl border border-red-200 bg-white px-3 py-1 text-xs text-red-700 hover:bg-red-50 transition shadow-sm"
                                             title="Delete Match"
-                                            aria-label={`Delete Match ${t.matchId}`}
                                         >
-                                            {/* icon */}
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5-4h4m-4 0a1 1 0 00-1 1v1h6V4a1 1 0 00-1-1m-4 0h4" />
-                                            </svg>
+                                            Delete
                                         </button>
                                     </div>
                                 );
@@ -874,8 +872,8 @@ const MatchPage: React.FC = () => {
                                     <div className="flex items-center gap-2 mb-1">
                                         <h4 className="text-lg md:text-xl font-bold text-gray-700">{t.opponent}</h4>
                                         <span className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
-            Ended
-          </span>
+                                            Ended
+                                        </span>
                                     </div>
 
                                     <p className="text-gray-500 text-xs md:text-sm mb-1">• {t.teamName}</p>
@@ -1015,6 +1013,7 @@ const MatchPage: React.FC = () => {
                     </aside>
                 </>
             )}
+
             {deleteOpen && matchToDelete && (
                 <>
                     {/* overlay */}
@@ -1037,9 +1036,7 @@ const MatchPage: React.FC = () => {
                                     Are you sure you want to delete{" "}
                                     <span className="font-semibold">{matchToDelete.opponent}</span>?
                                 </p>
-                                <p className="text-xs text-gray-400 mt-1">
-                                    ID: {matchToDelete.matchId}
-                                </p>
+                                <p className="text-xs text-gray-400 mt-1">ID: {matchToDelete.matchId}</p>
                             </div>
 
                             <div className="p-5">

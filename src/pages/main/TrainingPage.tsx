@@ -96,6 +96,12 @@ function authHeaders() {
     };
 }
 
+function getErrorMessage(err: unknown) {
+    if (err instanceof Error) return err.message;
+    if (typeof err === "string") return err;
+    return "Unknown error";
+}
+
 function toDate(date: string, time: string) {
     return new Date(`${date}T${time}`);
 }
@@ -170,9 +176,8 @@ const Trainings: React.FC = () => {
     const [selectedTeamId, setSelectedTeamId] = useState<string>("ALL");
     const [showHistory, setShowHistory] = useState(false);
 
-    // hlasovanie (lokálne, nastaví sa až keď klikneš)
+    // hlasovanie (lokálne)
     const [voteMap, setVoteMap] = useState<Record<string, Vote>>({});
-
 
     // attendance panel
     const [panelOpen, setPanelOpen] = useState(false);
@@ -190,20 +195,10 @@ const Trainings: React.FC = () => {
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
-
-    // attendance cache: trainingId -> list
+    // cache
     const attendanceCacheRef = useRef<Record<string, AttendanceApiItem[]>>({});
 
     const [nowTick, setNowTick] = useState(() => new Date());
-
-    const [createBody, setCreateBody] = useState<CreateTrainingBody>({
-        trainingName: "",
-        place: "",
-        date: "",
-        startTime: "18:00:00",
-        endTime: "19:30:00",
-        type: "HALA",
-    });
 
     const EMPTY_FORM: CreateTrainingBody = {
         trainingName: "",
@@ -214,25 +209,18 @@ const Trainings: React.FC = () => {
         type: "HALA",
     };
 
-
+    const [createBody, setCreateBody] = useState<CreateTrainingBody>({ ...EMPTY_FORM });
     const [creating, setCreating] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
     const [createSuccess, setCreateSuccess] = useState<string | null>(null);
 
-    // StrictMode guard (dev): aby init prebehol len raz
+    // StrictMode guard (dev)
     const didInitRef = useRef(false);
 
     useEffect(() => {
         const id = setInterval(() => setNowTick(new Date()), 30_000);
         return () => clearInterval(id);
     }, []);
-
-
-    function getErrorMessage(err: unknown) {
-        if (err instanceof Error) return err.message;
-        if (typeof err === "string") return err;
-        return "Unknown error";
-    }
 
     // ---------- FETCH: teams (iba raz) ----------
     const loadTeamsOnce = async (): Promise<TeamMemberItem[]> => {
@@ -257,10 +245,7 @@ const Trainings: React.FC = () => {
                 return;
             }
 
-            const res = await fetch(`${INTEGRATION_API}/teams/${teamId}/trainings/get`, {
-                headers: authHeaders(),
-            });
-
+            const res = await fetch(`${INTEGRATION_API}/teams/${teamId}/trainings/get`, { headers: authHeaders() });
             if (res.status === 401) throw new Error("401 Unauthorized – trainings get (token).");
             if (!res.ok) throw new Error(`Trainings get failed: ${res.status} ${res.statusText}`);
 
@@ -283,9 +268,7 @@ const Trainings: React.FC = () => {
         }
     };
 
-
-
-    // ---------- INIT: 1x member + 1x trainings ----------
+    // ---------- INIT ----------
     useEffect(() => {
         if (didInitRef.current) return;
         didInitRef.current = true;
@@ -301,7 +284,6 @@ const Trainings: React.FC = () => {
                 skipNextTeamEffectRef.current = true;
                 setSelectedTeamId(first);
 
-                // presne 1x trainings/get (len pre prvy team)
                 if (first !== "ALL") {
                     await loadTrainingsOnly(first);
                     await fetchMyAttendanceAndApply(first);
@@ -324,13 +306,13 @@ const Trainings: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // ---------- CHANGE TEAM: iba trainings/get (nie member) ----------
+    // ---------- CHANGE TEAM ----------
     useEffect(() => {
         if (!didInitRef.current) return;
 
         if (skipNextTeamEffectRef.current) {
             skipNextTeamEffectRef.current = false;
-            return; // ✅ nedaj druhý fetch
+            return;
         }
 
         if (!selectedTeamId || selectedTeamId === "ALL") {
@@ -344,10 +326,9 @@ const Trainings: React.FC = () => {
             await loadTrainingsOnly(selectedTeamId);
             await fetchMyAttendanceAndApply(selectedTeamId);
         })();
-
     }, [selectedTeamId]);
 
-    // ---------- ATTENDANCE: iba po kliknutí ----------
+    // ---------- ATTENDANCE ----------
     const fetchAttendance = async (teamId: string, trainingId: string, force?: boolean) => {
         setAttendanceLoading(true);
         setAttendanceError(null);
@@ -381,53 +362,23 @@ const Trainings: React.FC = () => {
         }
     };
 
-    const confirmDeleteTraining = async () => {
-        if (!trainingToDelete) return;
-
-        setDeleteLoading(true);
-        setDeleteError(null);
-
-        try {
-            const teamId = trainingToDelete.teamId;
-            const trainingId = trainingToDelete.trainingId;
-
-            const res = await fetch(
-                `${INTEGRATION_API}/teams/${teamId}/trainings/${trainingId}/delete`,
-                {
-                    method: "DELETE",
-                    headers: authHeaders(),
-                }
-            );
-
-            if (res.status === 401) throw new Error("401 Unauthorized – delete training (token).");
-
-            if (!res.ok) {
-                const txt = await res.text().catch(() => "");
-                throw new Error(`Delete failed: ${res.status} ${res.statusText}${txt ? ` – ${txt}` : ""}`);
-            }
-
-            setTrainings((prev) => prev.filter((x) => x.trainingId !== trainingId));
-
-            setVoteMap((m) => {
-                const copy = { ...m };
-                delete copy[trainingId];
-                return copy;
-            });
-            delete attendanceCacheRef.current[trainingId];
-
-            if (panelOpen && panelTrainingId === trainingId) {
-                closeAttendancePanel();
-            }
-
-            setDeleteOpen(false);
-            setTrainingToDelete(null);
-        } catch (e: unknown) {
-            setDeleteError(getErrorMessage(e));
-        } finally {
-            setDeleteLoading(false);
-        }
+    const closeAttendancePanel = () => {
+        setPanelOpen(false);
+        setPanelTrainingName(null);
+        setPanelTeamId(null);
+        setPanelTrainingId(null);
+        setAttendanceItems([]);
+        setAttendanceError(null);
+        setAttendanceLoading(false);
     };
 
+    const openAttendancePanel = async (teamId: string, trainingId: string, trainingName: string) => {
+        setPanelTeamId(teamId);
+        setPanelTrainingId(trainingId);
+        setPanelTrainingName(trainingName);
+        setPanelOpen(true);
+        await fetchAttendance(teamId, trainingId);
+    };
 
     const fetchMyAttendanceAndApply = async (teamId: string) => {
         if (!teamId || teamId === "ALL") {
@@ -471,7 +422,6 @@ const Trainings: React.FC = () => {
             throw new Error(`Attendance update failed: ${res.status} ${res.statusText}${txt ? ` – ${txt}` : ""}`);
         }
 
-        // invalidate cache
         delete attendanceCacheRef.current[trainingId];
     };
 
@@ -492,24 +442,52 @@ const Trainings: React.FC = () => {
         }
     };
 
-    const openAttendancePanel = async (teamId: string, trainingId: string, trainingName: string) => {
-        setPanelTeamId(teamId);
-        setPanelTrainingId(trainingId);
-        setPanelTrainingName(trainingName);
-        setPanelOpen(true);
-        await fetchAttendance(teamId, trainingId);
+    // ---------- DELETE TRAINING ----------
+    const confirmDeleteTraining = async () => {
+        if (!trainingToDelete) return;
+
+        setDeleteLoading(true);
+        setDeleteError(null);
+
+        try {
+            const teamId = trainingToDelete.teamId;
+            const trainingId = trainingToDelete.trainingId;
+
+            const res = await fetch(`${INTEGRATION_API}/teams/${teamId}/trainings/${trainingId}/delete`, {
+                method: "DELETE",
+                headers: authHeaders(),
+            });
+
+            if (res.status === 401) throw new Error("401 Unauthorized – delete training (token).");
+
+            if (!res.ok) {
+                const txt = await res.text().catch(() => "");
+                throw new Error(`Delete failed: ${res.status} ${res.statusText}${txt ? ` – ${txt}` : ""}`);
+            }
+
+            setTrainings((prev) => prev.filter((x) => x.trainingId !== trainingId));
+
+            setVoteMap((m) => {
+                const copy = { ...m };
+                delete copy[trainingId];
+                return copy;
+            });
+            delete attendanceCacheRef.current[trainingId];
+
+            if (panelOpen && panelTrainingId === trainingId) {
+                closeAttendancePanel();
+            }
+
+            setDeleteOpen(false);
+            setTrainingToDelete(null);
+        } catch (e: unknown) {
+            setDeleteError(getErrorMessage(e));
+        } finally {
+            setDeleteLoading(false);
+        }
     };
 
-    const closeAttendancePanel = () => {
-        setPanelOpen(false);
-        setPanelTrainingName(null);
-        setPanelTeamId(null);
-        setPanelTrainingId(null);
-        setAttendanceItems([]);
-        setAttendanceError(null);
-        setAttendanceLoading(false);
-    };
-
+    // ---------- DERIVED LISTS ----------
     const filteredTrainings = useMemo(() => {
         if (selectedTeamId === "ALL") return trainings;
         return trainings.filter((t) => t.teamId === selectedTeamId);
@@ -585,20 +563,18 @@ const Trainings: React.FC = () => {
             }
 
             setCreateSuccess("Training has been created.");
-            setCreateBody((prev) => ({ ...prev, trainingName: "", place: "", date: "" }));
             setShowCreate(false);
-            setCreateBody(EMPTY_FORM);
-            loadTrainingsOnly(selectedTeamId);
 
-            setTimeout(() => {
-                setCreateSuccess(null);
-            }, 2000);
+            // reset form
+            setCreateBody({ ...EMPTY_FORM });
 
-            // refresh trainings len pre current team (1x trainings/get)
+            // refresh trainings + attendance
             attendanceCacheRef.current = {};
             setVoteMap({});
             await loadTrainingsOnly(selectedTeamId);
             await fetchMyAttendanceAndApply(selectedTeamId);
+
+            setTimeout(() => setCreateSuccess(null), 2000);
         } catch (e: unknown) {
             setCreateError(getErrorMessage(e));
         } finally {
@@ -606,7 +582,7 @@ const Trainings: React.FC = () => {
         }
     };
 
-    /* ================= UI (tvoje pôvodné UI nechávam) ================= */
+    /* ================= UI ================= */
 
     return (
         <div className="bg-gray-100 p-6 w-full">
@@ -910,34 +886,19 @@ const Trainings: React.FC = () => {
                                                         <p className="text-gray-400 text-[11px]">Training ID: {t.trainingId}</p>
                                                     </div>
 
+                                                    {/* ✅ CHANGED DELETE BUTTON (pill style) */}
                                                     <button
                                                         type="button"
-                                                        className="absolute bottom-5 right-5 text-red-600 hover:text-red-700 transition"
                                                         onClick={() => {
                                                             setDeleteError(null);
                                                             setTrainingToDelete(t);
                                                             setDeleteOpen(true);
                                                         }}
+                                                        className="absolute bottom-5 right-5 rounded-xl border border-red-200 bg-white px-3 py-1 text-xs text-red-700 hover:bg-red-50 transition shadow-sm"
                                                         title="Delete Training"
-                                                        aria-label={`Delete training ${t.trainingId}`}
-
                                                     >
-                                                        <svg
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                            className="h-5 w-5"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                            strokeWidth={2}
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5-4h4m-4 0a1 1 0 00-1 1v1h6V4a1 1 0 00-1-1m-4 0h4"
-                                                            />
-                                                        </svg>
+                                                        Delete
                                                     </button>
-
                                                 </div>
                                             );
                                         })}
@@ -1136,9 +1097,10 @@ const Trainings: React.FC = () => {
                     </aside>
                 </>
             )}
+
+            {/* -------------------- DELETE MODAL -------------------- */}
             {deleteOpen && trainingToDelete && (
                 <>
-                    {/* overlay */}
                     <div
                         className="fixed inset-0 bg-black/30 backdrop-blur-[1px]"
                         onClick={() => {
@@ -1149,7 +1111,6 @@ const Trainings: React.FC = () => {
                         }}
                     />
 
-                    {/* modal */}
                     <div className="fixed inset-0 flex items-center justify-center p-4">
                         <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-gray-200">
                             <div className="p-5 border-b border-gray-200">
@@ -1158,9 +1119,7 @@ const Trainings: React.FC = () => {
                                     Are you sure you want to delete{" "}
                                     <span className="font-semibold">{trainingToDelete.trainingName}</span>?
                                 </p>
-                                <p className="text-xs text-gray-400 mt-1">
-                                    ID: {trainingToDelete.trainingId}
-                                </p>
+                                <p className="text-xs text-gray-400 mt-1">ID: {trainingToDelete.trainingId}</p>
                             </div>
 
                             <div className="p-5">
@@ -1198,7 +1157,6 @@ const Trainings: React.FC = () => {
                     </div>
                 </>
             )}
-
         </div>
     );
 };
