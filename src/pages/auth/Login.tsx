@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 interface LoginProps {
     onLogin: () => void;
@@ -8,10 +8,22 @@ interface LoginProps {
 type LoginResponse = {
     clientId: string;
     accessToken: string;
-    refreshToken?: string; // optional (backend ho možno neposiela)
+    refreshToken?: string;
+};
+
+type ProfileResponse = {
+    clientId: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    dateOfBirth: string | null;
+    stick: string | null;
+    profileCompleted: boolean;
 };
 
 const AUTH_API = import.meta.env.VITE_USER_API;
+
+/* ---------------- API helpers ---------------- */
 
 async function login(email: string, password: string): Promise<LoginResponse> {
     const res = await fetch(`${AUTH_API}/auth/login`, {
@@ -37,11 +49,34 @@ async function login(email: string, password: string): Promise<LoginResponse> {
     return json;
 }
 
+async function getMyProfile(token: string): Promise<ProfileResponse> {
+    const res = await fetch(`${AUTH_API}/auth/profile/me`, {
+        method: "GET",
+        headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+        },
+    });
+
+    if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(
+            `Profile fetch failed: ${res.status} ${res.statusText}${txt ? ` – ${txt}` : ""}`
+        );
+    }
+
+    return (await res.json()) as ProfileResponse;
+}
+
+/* ---------------- Component ---------------- */
+
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
     const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -50,21 +85,30 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         setLoading(true);
 
         try {
+            // 1️⃣ login
             const data = await login(email, password);
 
             localStorage.setItem("accessToken", data.accessToken);
             localStorage.setItem("clientId", data.clientId);
 
-            // backend ti refreshToken neposiela (podľa príkladu), tak ho ukladaj len keď existuje
             if (data.refreshToken) {
                 localStorage.setItem("refreshToken", data.refreshToken);
             } else {
                 localStorage.removeItem("refreshToken");
             }
 
+            const profile = await getMyProfile(data.accessToken);
+
             onLogin();
-            navigate("/", { replace: true });
-            console.log("Login successful:", data);
+
+            if (!profile.profileCompleted) {
+                navigate("/complete-profile", { replace: true });
+            } else {
+                navigate("/", { replace: true });
+            }
+
+            console.log("Login successful:", data, profile);
+
         } catch (err: unknown) {
             if (err instanceof Error) setError(err.message);
             else setError("Something went wrong");
@@ -90,6 +134,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                             required
                             autoComplete="email"
+                            disabled={loading}
                         />
                     </div>
 
@@ -102,6 +147,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                             required
                             autoComplete="current-password"
+                            disabled={loading}
                         />
                     </div>
 
@@ -115,13 +161,16 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 </form>
 
                 <p className="mt-4 text-center">
-                    Don't have an account?{" "}
-                    <span
-                        onClick={() => navigate("/register")}
-                        className="text-blue-600 hover:underline cursor-pointer"
-                    >
-            Registration
-          </span>
+                    Don&apos;t have an account?{" "}
+                    <Link to="/register" className="text-blue-600 hover:underline">
+                        Registration
+                    </Link>
+                </p>
+
+                <p className="mt-2 text-center text-sm">
+                    <Link to="/forgot-password" className="text-blue-600 hover:underline">
+                        Forgot password?
+                    </Link>
                 </p>
             </div>
         </div>

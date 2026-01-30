@@ -2,7 +2,7 @@
   "name": "train-io-app",
   "homepage": "https://Ujhyi.github.io/train-io-w-app",
   "private": true,
-  "version": "0.0.1",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
