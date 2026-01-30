@@ -43,13 +43,13 @@ function getErrorMessage(err: unknown) {
 const EMPTY_CREATE: CreateTeamBody = {
     name: "",
     shortcut: "",
-    category: "WAS",
+    category: "MEX",
 };
 
 const OwnedTeamsPage: React.FC = () => {
     // create
     const [showCreate, setShowCreate] = useState(false);
-    const [createBody, setCreateBody] = useState<CreateTeamBody>(EMPTY_CREATE);
+    const [createBody, setCreateBody] = useState<CreateTeamBody>({ ...EMPTY_CREATE });
     const [creating, setCreating] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
     const [createSuccess, setCreateSuccess] = useState<string | null>(null);
@@ -59,11 +59,17 @@ const OwnedTeamsPage: React.FC = () => {
     const [ownedLoading, setOwnedLoading] = useState(true);
     const [ownedError, setOwnedError] = useState<string | null>(null);
 
-    // players panel-ish (simple inline)
+    // players
     const [playersOpenForTeamId, setPlayersOpenForTeamId] = useState<string | null>(null);
     const [playersLoading, setPlayersLoading] = useState(false);
     const [playersError, setPlayersError] = useState<string | null>(null);
     const [players, setPlayers] = useState<PlayerItem[]>([]);
+
+    // delete modal
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleteTeam, setDeleteTeam] = useState<OwnedTeamItem | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     const canCreate = useMemo(() => {
         return (
@@ -83,8 +89,7 @@ const OwnedTeamsPage: React.FC = () => {
             if (!res.ok) throw new Error(`Owned teams failed: ${res.status} ${res.statusText}`);
 
             const json = await res.json();
-            const list: OwnedTeamItem[] = Array.isArray(json) ? json : [];
-            setOwnedTeams(list);
+            setOwnedTeams(Array.isArray(json) ? (json as OwnedTeamItem[]) : []);
         } catch (e: unknown) {
             setOwnedTeams([]);
             setOwnedError(getErrorMessage(e));
@@ -108,8 +113,7 @@ const OwnedTeamsPage: React.FC = () => {
             if (!res.ok) throw new Error(`Players failed: ${res.status} ${res.statusText}`);
 
             const json = await res.json();
-            const list: PlayerItem[] = Array.isArray(json) ? json : [];
-            setPlayers(list);
+            setPlayers(Array.isArray(json) ? (json as PlayerItem[]) : []);
             setPlayersOpenForTeamId(teamId);
         } catch (e: unknown) {
             setPlayers([]);
@@ -152,18 +156,57 @@ const OwnedTeamsPage: React.FC = () => {
             }
 
             setCreateSuccess("Team has been created.");
-            setCreateBody(EMPTY_CREATE);     // ✅ vyprázdni formulár
-            setShowCreate(false);            // ✅ skry formulár
+            setCreateBody({ ...EMPTY_CREATE });
+            setShowCreate(false);
 
-            // refresh list
             await loadOwnedTeams();
 
-            // auto-hide success
             window.setTimeout(() => setCreateSuccess(null), 2000);
         } catch (e: unknown) {
             setCreateError(getErrorMessage(e));
         } finally {
             setCreating(false);
+        }
+    };
+
+    // delete helpers
+    const openDeleteDialog = (team: OwnedTeamItem) => {
+        setDeleteError(null);
+        setDeleteTeam(team);
+        setDeleteDialogOpen(true);
+    };
+
+    const closeDeleteDialog = () => {
+        if (deleteLoading) return;
+        setDeleteDialogOpen(false);
+        setDeleteTeam(null);
+        setDeleteError(null);
+    };
+
+    const confirmDeleteTeam = async () => {
+        if (!deleteTeam) return;
+
+        setDeleteLoading(true);
+        setDeleteError(null);
+
+        try {
+            const res = await fetch(`${CORE_API}/teams/delete/${deleteTeam.teamId}`, {
+                method: "DELETE",
+                headers: authHeaders(),
+            });
+
+            if (res.status === 401) throw new Error("401 Unauthorized – accessToken (Bearer).");
+            if (!res.ok) {
+                const txt = await res.text().catch(() => "");
+                throw new Error(`Delete failed: ${res.status} ${res.statusText}${txt ? ` – ${txt}` : ""}`);
+            }
+
+            setOwnedTeams((prev) => prev.filter((t) => t.teamId !== deleteTeam.teamId));
+            closeDeleteDialog();
+        } catch (e: unknown) {
+            setDeleteError(getErrorMessage(e));
+        } finally {
+            setDeleteLoading(false);
         }
     };
 
@@ -199,7 +242,11 @@ const OwnedTeamsPage: React.FC = () => {
                             className="ml-auto inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50 text-sm shadow-sm"
                             title={showCreate ? "Hide" : "Show"}
                         >
-                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${showCreate ? "bg-indigo-500" : "bg-gray-400"}`} />
+              <span
+                  className={`inline-block h-1.5 w-1.5 rounded-full ${
+                      showCreate ? "bg-indigo-500" : "bg-gray-400"
+                  }`}
+              />
                             {showCreate ? "Hide" : "Show"}
                         </button>
                     </div>
@@ -242,9 +289,9 @@ const OwnedTeamsPage: React.FC = () => {
                                         className="w-full h-9 px-3 rounded-lg border border-gray-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
                                         required
                                     >
-                                        <option value="WAS">WAS</option>
-                                        <option value="MAS">MAS</option>
-                                        <option value="JUN">JUN</option>
+                                        <option value="MEX">MEX</option>
+                                        <option value="JEX">JEX</option>
+                                        <option value="Dor">Dor</option>
                                     </select>
                                 </div>
 
@@ -264,7 +311,9 @@ const OwnedTeamsPage: React.FC = () => {
                 <section className="bg-white shadow-xl rounded-2xl p-4 md:p-10 mb-10 md:mb-12 border border-gray-200">
                     <div className="flex items-center gap-3 mb-4 md:mb-6">
                         <h2 className="text-xl md:text-2xl font-bold text-gray-800">My Teams</h2>
-                        {!ownedLoading && !ownedError && <span className="text-sm text-gray-500">({ownedTeams.length})</span>}
+                        {!ownedLoading && !ownedError && (
+                            <span className="text-sm text-gray-500">({ownedTeams.length})</span>
+                        )}
                     </div>
 
                     {ownedLoading ? (
@@ -305,6 +354,14 @@ const OwnedTeamsPage: React.FC = () => {
                                             <p className="text-gray-400 text-[11px]">Team ID: {t.teamId}</p>
 
                                             <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openDeleteDialog(t)}
+                                                    className="rounded-xl border border-red-200 bg-white px-3 py-1 text-xs text-red-700 hover:bg-red-50 transition shadow-sm"
+                                                >
+                                                    Delete
+                                                </button>
+
                                                 {!playersOpen ? (
                                                     <button
                                                         type="button"
@@ -368,6 +425,53 @@ const OwnedTeamsPage: React.FC = () => {
                     )}
                 </section>
             </div>
+
+            {/* Delete modal */}
+            {deleteDialogOpen && deleteTeam && (
+                <>
+                    <div className="fixed inset-0 bg-black/30 backdrop-blur-[1px]" onClick={closeDeleteDialog} />
+
+                    <div className="fixed inset-0 flex items-center justify-center p-4">
+                        <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-gray-200">
+                            <div className="p-5 border-b border-gray-200">
+                                <h3 className="text-lg font-bold text-gray-800">Delete team?</h3>
+                                <p className="text-sm text-gray-600 mt-1">
+                                    Are you sure you want to delete <span className="font-semibold">{deleteTeam.name}</span>?
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">ID: {deleteTeam.teamId}</p>
+                            </div>
+
+                            <div className="p-5">
+                                {deleteError && (
+                                    <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                        {deleteError}
+                                    </div>
+                                )}
+
+                                <div className="flex items-center justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={deleteLoading}
+                                        onClick={closeDeleteDialog}
+                                        className="rounded-xl border border-gray-200 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                                    >
+                                        No
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={deleteLoading}
+                                        onClick={confirmDeleteTeam}
+                                        className="rounded-xl bg-red-600 hover:bg-red-700 px-3 py-1 text-sm font-medium text-white disabled:opacity-60"
+                                    >
+                                        {deleteLoading ? "Deleting..." : "Yes, delete"}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };

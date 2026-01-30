@@ -10,15 +10,12 @@ type TeamMemberItem = {
     owner?: string;
 };
 
-type TeamAction = "LEAVE" | "DELETE";
-
 type JoinBody = {
     position: string;
     number: number;
 };
 
 const CORE_API = import.meta.env.VITE_CORE_API;
-
 
 function authHeaders() {
     const token = localStorage.getItem("accessToken");
@@ -42,8 +39,7 @@ const EMPTY_JOIN_FORM: JoinBody = {
 
 const JoinPage: React.FC = () => {
     const [joinToken, setJoinToken] = useState("");
-
-    const [form, setForm] = useState<JoinBody>(EMPTY_JOIN_FORM);
+    const [form, setForm] = useState<JoinBody>({ ...EMPTY_JOIN_FORM });
 
     const [joining, setJoining] = useState(false);
     const [joinError, setJoinError] = useState<string | null>(null);
@@ -54,7 +50,6 @@ const JoinPage: React.FC = () => {
     const [teamsError, setTeamsError] = useState<string | null>(null);
 
     const [teamDialogOpen, setTeamDialogOpen] = useState(false);
-    const [teamDialogAction, setTeamDialogAction] = useState<TeamAction>("LEAVE");
     const [teamDialogTeam, setTeamDialogTeam] = useState<TeamMemberItem | null>(null);
 
     const [teamActionLoading, setTeamActionLoading] = useState(false);
@@ -117,13 +112,11 @@ const JoinPage: React.FC = () => {
             }
 
             setJoinSuccess("Joined successfully.");
-            setTimeout(() => setJoinSuccess(null), 3000);
+            window.setTimeout(() => setJoinSuccess(null), 3000);
 
-            // vycisti formular
             setJoinToken("");
-            setForm(EMPTY_JOIN_FORM);
+            setForm({ ...EMPTY_JOIN_FORM });
 
-            // refresh team list
             await loadMemberTeams();
         } catch (e) {
             setJoinError(getErrorMessage(e));
@@ -132,10 +125,9 @@ const JoinPage: React.FC = () => {
         }
     };
 
-    const openTeamDialog = (team: TeamMemberItem, action: TeamAction) => {
+    const openTeamDialog = (team: TeamMemberItem) => {
         setTeamActionError(null);
         setTeamDialogTeam(team);
-        setTeamDialogAction(action);
         setTeamDialogOpen(true);
     };
 
@@ -146,7 +138,7 @@ const JoinPage: React.FC = () => {
         setTeamActionError(null);
     };
 
-    const confirmTeamAction = async () => {
+    const confirmLeaveTeam = async () => {
         if (!teamDialogTeam) return;
 
         setTeamActionLoading(true);
@@ -155,12 +147,7 @@ const JoinPage: React.FC = () => {
         try {
             const teamId = teamDialogTeam.teamId;
 
-            const endpoint =
-                teamDialogAction === "LEAVE"
-                    ? `${CORE_API}/teams/leave/${teamId}`
-                    : `${CORE_API}/teams/delete/${teamId}`;
-
-            const res = await fetch(endpoint, {
+            const res = await fetch(`${CORE_API}/teams/leave/${teamId}`, {
                 method: "DELETE",
                 headers: authHeaders(),
             });
@@ -169,15 +156,12 @@ const JoinPage: React.FC = () => {
 
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                throw new Error(
-                    `${teamDialogAction} failed: ${res.status} ${res.statusText}${txt ? ` – ${txt}` : ""}`
-                );
+                throw new Error(`LEAVE failed: ${res.status} ${res.statusText}${txt ? ` – ${txt}` : ""}`);
             }
 
-            // odstráň tím z UI
-            setTeams((prev) => prev.filter((t) => t.teamId !== teamId));
-
+            // zavri modal + refreshni zo servera (najistejšie)
             closeTeamDialog();
+            await loadMemberTeams();
         } catch (e: unknown) {
             setTeamActionError(getErrorMessage(e));
         } finally {
@@ -185,13 +169,13 @@ const JoinPage: React.FC = () => {
         }
     };
 
-
     return (
         <div className="bg-gray-100 p-6 w-full">
             <div className="max-w-7xl mx-auto">
-                {/* Header */}
                 <div className="flex items-center gap-2 mb-6 md:mb-8">
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-800">Join Team</h1>
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-800">
+                        Join Team
+                    </h1>
 
                     <button
                         onClick={loadMemberTeams}
@@ -268,7 +252,9 @@ const JoinPage: React.FC = () => {
                 <section className="bg-white shadow-xl rounded-2xl p-4 md:p-10 mb-10 md:mb-12 border border-gray-200">
                     <div className="flex items-center gap-3 mb-4 md:mb-6">
                         <h2 className="text-xl md:text-2xl font-bold text-gray-800">My Teams</h2>
-                        {!teamsLoading && !teamsError && <span className="text-sm text-gray-500">({teams.length})</span>}
+                        {!teamsLoading && !teamsError && (
+                            <span className="text-sm text-gray-500">({teams.length})</span>
+                        )}
                     </div>
 
                     {teamsLoading ? (
@@ -278,7 +264,8 @@ const JoinPage: React.FC = () => {
                     ) : teams.length === 0 ? (
                         <p className="text-gray-500 text-sm">No teams yet.</p>
                     ) : (
-                        <div className="grid grid-cols-1 gap-4 md:gap-6">                            {teams.map((t) => (
+                        <div className="grid grid-cols-1 gap-4 md:gap-6">
+                            {teams.map((t) => (
                                 <div
                                     key={t.teamId}
                                     className="relative bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-lg p-4 md:p-6 transition border border-gray-200"
@@ -292,9 +279,15 @@ const JoinPage: React.FC = () => {
                                         ) : null}
                                     </div>
 
-                                    {t.owner ? <p className="text-gray-500 text-xs md:text-sm mb-1">• Owner: {t.owner}</p> : null}
-                                    {t.category ? <p className="text-gray-500 text-xs md:text-sm mb-1">• Category: {t.category}</p> : null}
-                                    {t.clientId ? <p className="text-gray-500 text-xs md:text-sm mb-1">• Client: {t.clientId}</p> : null}
+                                    {t.owner ? (
+                                        <p className="text-gray-500 text-xs md:text-sm mb-1">• Owner: {t.owner}</p>
+                                    ) : null}
+                                    {t.category ? (
+                                        <p className="text-gray-500 text-xs md:text-sm mb-1">• Category: {t.category}</p>
+                                    ) : null}
+                                    {t.clientId ? (
+                                        <p className="text-gray-500 text-xs md:text-sm mb-1">• Client: {t.clientId}</p>
+                                    ) : null}
 
                                     <div className="mt-3 pt-3 border-t border-gray-200/70 flex items-center justify-between gap-3">
                                         <p className="text-gray-400 text-[11px]">Team ID: {t.teamId}</p>
@@ -302,49 +295,32 @@ const JoinPage: React.FC = () => {
                                         <div className="flex items-center gap-2">
                                             <button
                                                 type="button"
-                                                onClick={() => openTeamDialog(t, "LEAVE")}
+                                                onClick={() => openTeamDialog(t)}
                                                 className="rounded-xl border border-yellow-200 px-3 py-1 text-xs text-yellow-800 hover:bg-yellow-50 transition disabled:opacity-60"
                                             >
                                                 Leave
                                             </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => openTeamDialog(t, "DELETE")}
-                                                className="rounded-xl border border-red-200 px-3 py-1 text-xs text-red-700 hover:bg-red-50 transition disabled:opacity-60"
-                                            >
-                                                Delete
-                                            </button>
                                         </div>
                                     </div>
-
                                 </div>
                             ))}
                         </div>
                     )}
                 </section>
             </div>
+
+            {/* Leave modal */}
             {teamDialogOpen && teamDialogTeam && (
                 <>
-                    {/* overlay */}
-                    <div
-                        className="fixed inset-0 bg-black/30 backdrop-blur-[1px]"
-                        onClick={closeTeamDialog}
-                    />
+                    <div className="fixed inset-0 bg-black/30 backdrop-blur-[1px]" onClick={closeTeamDialog} />
 
-                    {/* modal */}
                     <div className="fixed inset-0 flex items-center justify-center p-4">
                         <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-gray-200">
                             <div className="p-5 border-b border-gray-200">
-                                <h3 className="text-lg font-bold text-gray-800">
-                                    {teamDialogAction === "DELETE" ? "Delete team?" : "Leave team?"}
-                                </h3>
+                                <h3 className="text-lg font-bold text-gray-800">Leave team?</h3>
 
                                 <p className="text-sm text-gray-600 mt-1">
-                                    Are you sure you want to{" "}
-                                    <span className="font-semibold">
-              {teamDialogAction === "DELETE" ? "delete" : "leave"}
-            </span>{" "}
+                                    Are you sure you want to <span className="font-semibold">leave</span>{" "}
                                     <span className="font-semibold">{teamDialogTeam.name}</span>?
                                 </p>
 
@@ -371,17 +347,10 @@ const JoinPage: React.FC = () => {
                                     <button
                                         type="button"
                                         disabled={teamActionLoading}
-                                        onClick={confirmTeamAction}
-                                        className={[
-                                            "rounded-xl px-3 py-1 text-sm font-medium text-white disabled:opacity-60",
-                                            teamDialogAction === "DELETE" ? "bg-red-600 hover:bg-red-700" : "bg-yellow-500 hover:bg-yellow-600",
-                                        ].join(" ")}
+                                        onClick={confirmLeaveTeam}
+                                        className="rounded-xl bg-yellow-500 hover:bg-yellow-600 px-3 py-1 text-sm font-medium text-white disabled:opacity-60"
                                     >
-                                        {teamActionLoading
-                                            ? "Working..."
-                                            : teamDialogAction === "DELETE"
-                                                ? "Yes, delete"
-                                                : "Yes, leave"}
+                                        {teamActionLoading ? "Leaving..." : "Yes, leave"}
                                     </button>
                                 </div>
                             </div>
@@ -389,7 +358,6 @@ const JoinPage: React.FC = () => {
                     </div>
                 </>
             )}
-
         </div>
     );
 };
